@@ -11,8 +11,6 @@
 **Follow every match of the FIFA World Cup 2026 in real time.**
 Live scores · Group standings · Knockout bracket
 
-[Live Demo](#) · [Report a Bug](#) · [Request a Feature](#)
-
 </div>
 
 ---
@@ -22,8 +20,6 @@ Live scores · Group standings · Knockout bracket
 | Home — Live & Upcoming | Group Standings | Knockout Bracket |
 |---|---|---|
 | ![Home](.github/screenshots/home.png) | ![Standings](.github/screenshots/standings.png) | ![Bracket](.github/screenshots/bracket.png) |
-
-> Add your own screenshots to `.github/screenshots/` to populate the table above.
 
 ---
 
@@ -43,7 +39,7 @@ Live scores · Group standings · Knockout bracket
 ## 🗂 Project Structure
 
 ```
-worldcup2026-tracker/
+WORLDCUP2026-frontend/
 ├── app/
 │   ├── page.jsx                  # Home — live & upcoming matches
 │   ├── fixtures/
@@ -62,56 +58,6 @@ worldcup2026-tracker/
 │   └── teams.js                  # Team map helper
 └── public/
 ```
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- npm or yarn
-
-### Installation
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/yourusername/worldcup2026-tracker.git
-cd worldcup2026-tracker
-
-# 2. Install dependencies
-npm install
-
-# 3. Run the development server
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
----
-
-## 🔧 Configuration
-
-### Polling Intervals
-
-In `hooks/usePolling.js`, you can adjust how frequently data refreshes:
-
-```js
-// Default: 30s idle, 10s during live matches
-usePolling(fetchFn, 30000, 10000);
-```
-
-### API Source
-
-All data comes from [worldcup26.ir](https://worldcup26.ir). The base URL is set in `lib/api.js`:
-
-```js
-const API_URL = "https://worldcup26.ir";
-```
-
-### Timezone
-
-All match times are displayed in **Asia/Beirut** (Lebanon, EEST UTC+3). To change this, search for `Asia/Beirut` across the codebase and replace with your preferred timezone string.
 
 ---
 
@@ -137,42 +83,12 @@ Match statuses are derived client-side:
 
 | Layer | Technology |
 |---|---|
-| Framework | [Next.js 15](https://nextjs.org) (App Router) |
+| Framework | [Next.js 16](https://nextjs.org) (App Router) |
 | UI | [React 19](https://react.dev) |
 | Styling | [Tailwind CSS v3](https://tailwindcss.com) |
 | Data Source | [worldcup26.ir](https://worldcup26.ir) REST API |
 | Fonts | Custom display + body font via `globals.css` |
-| Deployment | [Vercel](https://vercel.com) (recommended) |
-
----
-
-## 🚢 Deployment
-
-### Vercel (Recommended)
-
-```bash
-npm install -g vercel
-vercel
-```
-
-### Other platforms
-
-```bash
-npm run build
-npm start
-```
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please open an issue first to discuss what you'd like to change.
-
-1. Fork the repo
-2. Create your branch: `git checkout -b feature/your-feature`
-3. Commit your changes: `git commit -m 'feat: add your feature'`
-4. Push to the branch: `git push origin feature/your-feature`
-5. Open a Pull Request
+| Deployment | [Vercel](https://vercel.com) |
 
 ---
 
@@ -190,5 +106,5 @@ Distributed under the MIT License. See `LICENSE` for more information.
 ---
 
 <div align="center">
-  <sub>FIFA World Cup 2026 · USA · Canada · Mexico 🇺🇸🇨🇦🇲🇽</sub>
+  <sub>FIFA World Cup 2026 · USA · Canada · Mexico</sub>
 </div>
