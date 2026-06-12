@@ -8,18 +8,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [1.4.0] — 2026-06-12
 
-### Added
-- **Push notifications** — opt-in goal alerts using the Web Push API and VAPID authentication
-  - `public/sw.js` Service Worker handles incoming push events and `notificationclick`
-  - `hooks/usePushNotifications.js` manages Service Worker registration, permission requests, and subscription lifecycle
-  - `app/api/push/subscribe/route.js` saves push subscriptions server-side
-  - `app/api/push/unsubscribe/route.js` removes subscriptions on opt-out
-  - `app/api/push/send/route.js` broadcasts a notification to all subscribers
-  - `NotificationButton` component in the navbar for one-click opt-in / opt-out
-- **Goal detection** in `usePolling` — compares previous and current scores each poll cycle; fires `/api/push/send` automatically when a goal is detected
-- Notifications include team names, live score, and a deep link back to the site
-- Notification `tag` per match prevents duplicate stacked alerts
-
 ### Changed
 - `usePolling` now stores previous match data in a `useRef` to enable score diffing without triggering re-renders
 
