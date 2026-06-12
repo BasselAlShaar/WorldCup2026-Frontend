@@ -1,8 +1,7 @@
+"use client";
+import { useCallback } from "react";
+import { usePolling } from "@/hooks/usePolling";
 import MatchCard from "@/components/MatchCard/page";
-import { getGames } from "@/lib/api";
-import { getTeamMap } from "@/lib/teams";
-
-export const dynamic = "force-dynamic";
 
 function parseLocalDate(dateStr) {
   if (!dateStr) return new Date(8640000000000000);
@@ -14,7 +13,6 @@ function parseLocalDate(dateStr) {
   return isNaN(d.getTime()) ? new Date(8640000000000000) : d;
 }
 
-// Date header uses Lebanon timezone
 function formatDayHeader(isoDate) {
   return new Date(isoDate).toLocaleDateString("en-US", {
     timeZone: "Asia/Beirut",
@@ -24,22 +22,27 @@ function formatDayHeader(isoDate) {
   });
 }
 
-// Group by Lebanon calendar date (not UTC date)
 function groupByLebanonDate(matches) {
   const grouped = {};
   matches.forEach((m) => {
-    const key = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Beirut",
-    }).format(new Date(m.date)); // "2026-06-11"
+    const key = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Beirut" }).format(new Date(m.date));
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(m);
   });
   return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
 }
 
-async function getMatches() {
-  const [gamesRes, teamMap] = await Promise.all([getGames(), getTeamMap()]);
+async function fetchFixtures() {
+  const [gamesRes, teamsRes] = await Promise.all([
+    fetch("https://worldcup26.ir/get/games", { cache: "no-store" }).then((r) => r.json()),
+    fetch("https://worldcup26.ir/get/teams", { cache: "no-store" }).then((r) => r.json()),
+  ]);
+
   const games = gamesRes?.games ?? [];
+  const teamsArray = Array.isArray(teamsRes) ? teamsRes : teamsRes?.teams ?? [];
+  const teamMap = {};
+  teamsArray.forEach((t) => { teamMap[String(t.id)] = t; });
+
   const now = new Date();
 
   return games
@@ -47,14 +50,9 @@ async function getMatches() {
     .map((g) => {
       const finished = String(g.finished).toUpperCase() === "TRUE";
       const matchDate = parseLocalDate(g.local_date);
-      const isLive =
-        !finished &&
-        g.time_elapsed !== "notstarted" &&
-        matchDate <= now;
-
+      const isLive = !finished && g.time_elapsed !== "notstarted" && matchDate <= now;
       const homeTeamInfo = teamMap[String(g.home_team_id)];
       const awayTeamInfo = teamMap[String(g.away_team_id)];
-
       return {
         id: g._id,
         date: matchDate.toISOString(),
@@ -71,126 +69,81 @@ async function getMatches() {
     });
 }
 
-function DateSection({ date, matches, index }) {
-  const todayLB = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Beirut",
-  }).format(new Date());
-  const isToday = date === todayLB;
+export default function FixturesPage() {
+  const fetcher = useCallback(() => fetchFixtures(), []);
+  const { data: matches, loading } = usePolling(fetcher, 30000);
 
-  return (
-    <section
-      className="animate-slide-up"
-      style={{ animationDelay: `${index * 80}ms` }}
-    >
-      <div className="flex items-center gap-3 mb-5">
-        <span
-          className={`font-body font-semibold text-xs uppercase tracking-[0.2em] ${
-            isToday ? "text-amber-400" : "text-white/40"
-          }`}
-        >
-          {isToday ? "Today · " : ""}
-          {formatDayHeader(date)}
-        </span>
-        <div className="flex-1 h-px bg-white/8" />
-        <span className="text-white/20 text-xs tabular-nums">
-          {matches.length} {matches.length === 1 ? "match" : "matches"}
-        </span>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-3">
-        {matches.map((match) => (
-          <MatchCard key={match.id} match={match} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-export default async function FixturesPage() {
-  const matches = await getMatches();
-
-  if (!matches.length) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-12">
-        <PageHeader />
-        <div className="flex flex-col items-center justify-center py-24 text-white/20">
-          <span className="text-5xl mb-4">📋</span>
-          <p className="font-body text-sm tracking-widest uppercase">
-            No group stage matches found
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const liveMatches = matches.filter((m) => m.status === "live");
-  const upcoming = matches
-    .filter((m) => m.status === "upcoming")
-    .sort((a, b) => a.date.localeCompare(b.date));
-  const finished = matches
-    .filter((m) => m.status === "finished")
-    .sort((a, b) => b.date.localeCompare(a.date));
-
+  const liveMatches = matches?.filter((m) => m.status === "live") ?? [];
+  const upcoming = (matches?.filter((m) => m.status === "upcoming") ?? []).sort((a, b) => a.date.localeCompare(b.date));
+  const finished = (matches?.filter((m) => m.status === "finished") ?? []).sort((a, b) => b.date.localeCompare(a.date));
   const groupedRest = groupByLebanonDate([...upcoming, ...finished]);
+
+  const todayLB = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Beirut" }).format(new Date());
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-12">
-      <PageHeader totalMatches={matches.length} liveCount={liveMatches.length} />
-
-      <div className="space-y-12 mt-10">
-        {liveMatches.length > 0 && (
-          <section className="animate-slide-up">
-            <div className="flex items-center gap-3 mb-5">
-              <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs uppercase tracking-[0.2em] text-red-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                Live now
-              </span>
-              <div className="flex-1 h-px bg-red-500/20" />
-            </div>
-            <div className="grid md:grid-cols-2 gap-3">
-              {liveMatches.map((match) => (
-                <MatchCard key={match.id} match={match} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {groupedRest.map(([date, dayMatches], gi) => (
-          <DateSection
-            key={date}
-            date={date}
-            matches={dayMatches}
-            index={gi + (liveMatches.length > 0 ? 1 : 0)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PageHeader({ totalMatches, liveCount }) {
-  return (
-    <div className="animate-fade-in">
-      <div className="flex items-end justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="font-display text-5xl md:text-6xl text-white tracking-wider mb-2">
-            Fixtures
-          </h1>
-          <p className="text-white/40 font-body text-sm">
-            Group stage · All times in Beirut time
-            {totalMatches != null && (
-              <span className="ml-2 text-white/20">· {totalMatches} matches</span>
-            )}
-          </p>
-        </div>
-
-        {liveCount > 0 && (
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-body font-medium">
-            <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
-            {liveCount} match{liveCount !== 1 ? "es" : ""} live
+      <div className="animate-fade-in">
+        <div className="flex items-end justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="font-display text-5xl md:text-6xl text-white tracking-wider mb-2">Fixtures</h1>
+            <p className="text-white/40 font-body text-sm">
+              Group stage · All times in Beirut time
+              {matches != null && <span className="ml-2 text-white/20">· {matches.length} matches</span>}
+            </p>
           </div>
-        )}
+          {liveMatches.length > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-body font-medium">
+              <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+              {liveMatches.length} match{liveMatches.length !== 1 ? "es" : ""} live
+            </div>
+          )}
+        </div>
       </div>
+
+      {loading ? (
+        <div className="mt-10 space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="rounded-xl border border-white/10 bg-white/5 p-6 animate-pulse h-28" />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-12 mt-10">
+          {liveMatches.length > 0 && (
+            <section className="animate-slide-up">
+              <div className="flex items-center gap-3 mb-5">
+                <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs uppercase tracking-[0.2em] text-red-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                  Live now
+                </span>
+                <div className="flex-1 h-px bg-red-500/20" />
+              </div>
+              <div className="grid md:grid-cols-2 gap-3">
+                {liveMatches.map((match) => <MatchCard key={match.id} match={match} />)}
+              </div>
+            </section>
+          )}
+
+          {groupedRest.map(([date, dayMatches], gi) => {
+            const isToday = date === todayLB;
+            return (
+              <section key={date} className="animate-slide-up" style={{ animationDelay: `${gi * 80}ms` }}>
+                <div className="flex items-center gap-3 mb-5">
+                  <span className={`font-body font-semibold text-xs uppercase tracking-[0.2em] ${isToday ? "text-amber-400" : "text-white/40"}`}>
+                    {isToday ? "Today · " : ""}{formatDayHeader(date)}
+                  </span>
+                  <div className="flex-1 h-px bg-white/8" />
+                  <span className="text-white/20 text-xs tabular-nums">
+                    {dayMatches.length} {dayMatches.length === 1 ? "match" : "matches"}
+                  </span>
+                </div>
+                <div className="grid md:grid-cols-2 gap-3">
+                  {dayMatches.map((match) => <MatchCard key={match.id} match={match} />)}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

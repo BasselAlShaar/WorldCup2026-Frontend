@@ -1,8 +1,7 @@
+"use client";
+import { useCallback } from "react";
+import { usePolling } from "@/hooks/usePolling";
 import MatchCard from "@/components/MatchCard/page";
-import { getGames } from "@/lib/api";
-import { getTeamMap } from "@/lib/teams";
-
-export const dynamic = "force-dynamic";
 
 function parseLocalDate(dateStr) {
   if (!dateStr) return new Date(8640000000000000);
@@ -14,9 +13,17 @@ function parseLocalDate(dateStr) {
   return isNaN(d.getTime()) ? new Date(8640000000000000) : d;
 }
 
-async function getHomeMatches() {
-  const [gamesRes, teamMap] = await Promise.all([getGames(), getTeamMap()]);
+async function fetchHomeData() {
+  const [gamesRes, teamsRes] = await Promise.all([
+    fetch("https://worldcup26.ir/get/games", { cache: "no-store" }).then((r) => r.json()),
+    fetch("https://worldcup26.ir/get/teams", { cache: "no-store" }).then((r) => r.json()),
+  ]);
+
   const games = gamesRes?.games ?? [];
+  const teamsArray = Array.isArray(teamsRes) ? teamsRes : teamsRes?.teams ?? [];
+  const teamMap = {};
+  teamsArray.forEach((t) => { teamMap[String(t.id)] = t; });
+
   const now = new Date();
 
   return games
@@ -24,14 +31,9 @@ async function getHomeMatches() {
     .map((g) => {
       const finished = String(g.finished).toUpperCase() === "TRUE";
       const matchDate = parseLocalDate(g.local_date);
-      const isLive =
-        !finished &&
-        g.time_elapsed !== "notstarted" &&
-        matchDate <= now;
-
+      const isLive = !finished && g.time_elapsed !== "notstarted" && matchDate <= now;
       const homeTeamInfo = teamMap[String(g.home_team_id)];
       const awayTeamInfo = teamMap[String(g.away_team_id)];
-
       return {
         id: g._id,
         date: matchDate.toISOString(),
@@ -48,17 +50,16 @@ async function getHomeMatches() {
     });
 }
 
-export default async function Home() {
-  const allMatches = await getHomeMatches();
+export default function Home() {
+  const fetcher = useCallback(() => fetchHomeData(), []);
+  const { data: allMatches, loading } = usePolling(fetcher, 30000);
 
-  const liveMatches = allMatches.filter((m) => m.status === "live");
-  const upcomingMatches = allMatches
-    .filter((m) => m.status === "upcoming")
+  const liveMatches = allMatches?.filter((m) => m.status === "live") ?? [];
+  const upcomingMatches = (allMatches?.filter((m) => m.status === "upcoming") ?? [])
     .sort((a, b) => a.date.localeCompare(b.date));
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-12">
-      {/* Hero */}
       <div className="text-center mb-16 animate-fade-in">
         <p className="text-sm font-body font-medium text-white/40 uppercase tracking-[0.3em] mb-4">
           USA · Canada · Mexico
@@ -68,8 +69,7 @@ export default async function Home() {
           <span className="text-gold"> 2026</span>
         </h1>
         <p className="text-white/50 font-body max-w-md mx-auto">
-          Follow every match live. Scores update in real time, with full
-          fixtures, group standings and the knockout bracket.
+          Follow every match live. Scores update in real time, with full fixtures, group standings and the knockout bracket.
         </p>
       </div>
 
@@ -77,26 +77,18 @@ export default async function Home() {
       <section className="mb-14">
         <div className="flex items-center gap-3 mb-6">
           <span className="w-2.5 h-2.5 rounded-full bg-crimson animate-pulse-live" />
-          <h2 className="font-display text-3xl text-white tracking-wider">
-            Live now
-          </h2>
+          <h2 className="font-display text-3xl text-white tracking-wider">Live now</h2>
           <span className="ml-auto text-xs font-mono text-white/30">
             Auto-refreshing every 30s
           </span>
         </div>
 
-        {liveMatches.length > 0 ? (
+        {loading ? (
+          <LoadingSkeleton />
+        ) : liveMatches.length > 0 ? (
           <div className="grid md:grid-cols-2 gap-4">
             {liveMatches.map((match, i) => (
-              <div
-                key={match.id}
-                className="animate-slide-up"
-                style={{
-                  animationDelay: `${i * 80}ms`,
-                  animationFillMode: "both",
-                  opacity: 0,
-                }}
-              >
+              <div key={match.id} className="animate-slide-up" style={{ animationDelay: `${i * 80}ms`, animationFillMode: "both", opacity: 0 }}>
                 <MatchCard match={match} />
               </div>
             ))}
@@ -111,26 +103,16 @@ export default async function Home() {
       {/* Up Next */}
       <section>
         <div className="flex items-center gap-3 mb-6">
-          <h2 className="font-display text-3xl text-white tracking-wider">
-            Up next
-          </h2>
-          <span className="ml-auto text-xs font-mono text-white/30">
-            All times in Beirut time
-          </span>
+          <h2 className="font-display text-3xl text-white tracking-wider">Up next</h2>
+          <span className="ml-auto text-xs font-mono text-white/30">All times in Beirut time</span>
         </div>
 
-        {upcomingMatches.length > 0 ? (
+        {loading ? (
+          <LoadingSkeleton />
+        ) : upcomingMatches.length > 0 ? (
           <div className="grid md:grid-cols-2 gap-4">
             {upcomingMatches.slice(0, 6).map((match, i) => (
-              <div
-                key={match.id}
-                className="animate-slide-up"
-                style={{
-                  animationDelay: `${(i + liveMatches.length) * 60}ms`,
-                  animationFillMode: "both",
-                  opacity: 0,
-                }}
-              >
+              <div key={match.id} className="animate-slide-up" style={{ animationDelay: `${(i + liveMatches.length) * 60}ms`, animationFillMode: "both", opacity: 0 }}>
                 <MatchCard match={match} />
               </div>
             ))}
@@ -141,6 +123,16 @@ export default async function Home() {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="grid md:grid-cols-2 gap-4">
+      {[1, 2].map((i) => (
+        <div key={i} className="rounded-xl border border-white/10 bg-white/5 p-6 animate-pulse h-28" />
+      ))}
     </div>
   );
 }
